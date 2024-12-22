@@ -11,6 +11,9 @@ import embedding_bucketing.embedding_model_test as em
 from config import openai_key
 from config import SER_API_KEY
 
+import ao_core as ao
+from Arch__giftRecommender import arch
+
 client = OpenAI(api_key = openai_key,)
 
 possible_genres = ["Clothes", "Electronics", "Books", "Toys", "Jewelry", "Home", "Beauty", "Sports", "Food", "Music", "Movies", "Games", "Art", "Travel", "Pets", "Health", "Fitness", "Tech", "DIY", "Gardening", "Cooking", "Crafts", "Cars", "Outdoors", "Office", "School", "Baby", "Party", "Wedding", "Holidays", "Other"]
@@ -18,6 +21,9 @@ possible_genres = ["Clothes", "Electronics", "Books", "Toys", "Jewelry", "Home",
 em.config(openai_key)
 
 cache, bucket = em.init("embedding_cache", possible_genres)
+
+if "agent" not in st.session_state:
+    st.session_state.agent = ao.Agent(arch, "agent")
 
 
 def llm_call(input_message): #llm call method 
@@ -64,6 +70,19 @@ def get_price_binary(price):
         price_binary = [1,1]
     return price_binary
 
+def call_agent(input_to_agent):
+    print(input_to_agent)
+    response = st.session_state.agent.next_state(input_to_agent)
+    return response
+
+def train_agent(input_to_agent, label):
+    if label == "Recommend":
+        LABEL = [1,1,1,1,1,1,1,1,1,1]
+    else:
+        LABEL = [0,0,0,0,0,0,0,0,0,0]
+    st.session_state.agent.train(input_to_agent, LABEL)
+    
+
  
 
 st.title("Gift Recommender")
@@ -97,7 +116,23 @@ if st.button("Find gifts"):
 
     input_to_agent = np.concatenate([price_binary, genre_binary])
 
-    print(input_to_agent)
+    response = call_agent(input_to_agent)
+
+    counter = 0
+    for element in response:
+        if element == 1:
+            counter += 1
+    
+    percentage_response = counter/len(response)
+
+    st.write("Agent Recommendation: ", percentage_response)
+
+    if st.button("Recommend More"):
+        train_agent(input_to_agent, "Recommend")
+    if st.button("Recommend Less"):
+        train_agent(input_to_agent, "Don't Recommend")
+    
+
     
 
     st.write(f"Here is a gift idea for you: {product_name}")
