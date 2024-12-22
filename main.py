@@ -34,7 +34,7 @@ def get_random_product(search_term):
     params = {
   "engine": "google_shopping",
   "q": f"{search_term}",
-  "api_key": "6673a88cd7070e11560e328a12075f405db2d3a8b63c677d8dbeefa2a7a631ae"
+  "api_key": f"{SER_API_KEY}",
 }
 
     search = GoogleSearch(params)
