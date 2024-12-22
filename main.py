@@ -25,6 +25,10 @@ cache, bucket = em.init("embedding_cache", possible_genres)
 if "agent" not in st.session_state:
     st.session_state.agent = ao.Agent(arch, "agent")
 
+if "started"    not in st.session_state:
+    st.session_state.started = False
+
+
 
 def llm_call(input_message): #llm call method 
     response = client.chat.completions.create(
@@ -80,7 +84,7 @@ def train_agent(input_to_agent, label):
         LABEL = [1,1,1,1,1,1,1,1,1,1]
     else:
         LABEL = [0,0,0,0,0,0,0,0,0,0]
-    st.session_state.agent.train(input_to_agent, LABEL)
+    st.session_state.agent.next_state(input_to_agent, LABEL)
     
 
  
@@ -95,6 +99,9 @@ budget = st.number_input("What is your budget?", min_value=0, value=50)
 request = str(("What are some gift catagories that meet the following: age: ",age, "gender: ", gender, "budget: ", budget))
 
 if st.button("Find gifts"):
+    st.session_state.started = True
+
+if st.session_state.started:
     search_terms = []
 
     response = llm_call(request)
@@ -104,8 +111,6 @@ if st.button("Find gifts"):
     random.shuffle(search_terms)    #Shuffle the search terms to get a random one
 
     search_term = search_terms[0]
-
-    st.write(f"Searching for gifts based on the following search term: {search_term}")
 
     product_name, price, photos = get_random_product(search_term)
 
@@ -123,7 +128,7 @@ if st.button("Find gifts"):
         if element == 1:
             counter += 1
     
-    percentage_response = counter/len(response)
+    percentage_response = str((counter/len(response))*100) + "%"
 
     st.write("Agent Recommendation: ", percentage_response)
 
