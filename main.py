@@ -5,16 +5,18 @@ import random
 from serpapi import GoogleSearch
 from openai import OpenAI
 
-# for embedding model
 import embedding_bucketing.embedding_model_test as em
-
 
 from config import openai_key
 from config import SER_API_KEY
 
 client = OpenAI(api_key = openai_key,)
 
+possible_genres = ["Clothes", "Electronics", "Books", "Toys", "Jewelry", "Home", "Beauty", "Sports", "Food", "Music", "Movies", "Games", "Art", "Travel", "Pets", "Health", "Fitness", "Tech", "DIY", "Gardening", "Cooking", "Crafts", "Cars", "Outdoors", "Office", "School", "Baby", "Party", "Wedding", "Holidays", "Other"]
+
 em.config(openai_key)
+
+cache, bucket = em.init("embedding_cache", possible_genres)
 
 
 def llm_call(input_message): #llm call method 
@@ -48,6 +50,19 @@ def get_random_product(search_term):
     thumbnail = shopping_results[0]["thumbnail"]
     return name, price, thumbnail
 
+def get_price_binary(price):
+    # Convert price to binary
+    price = float(price.replace("$", ""))
+    if price <25:
+        price_binary = [0,0]
+    elif price <50:
+        price_binary = [0,1]
+    elif price <100:
+        price_binary = [1,0]
+    else:
+        price_binary = [1,1]
+    return price_binary
+
  
 
 st.title("Gift Recommender")
@@ -66,8 +81,6 @@ if st.button("Find gifts"):
 
     search_terms = [line.split('. ', 1)[1] + ' ' for line in response.splitlines() if '. ' in line]
 
-    cache, buckets= em.init("genre_embedding_cache", search_terms)  #Initialize the embedding model with the search terms
-
     random.shuffle(search_terms)    #Shuffle the search terms to get a random one
 
     search_term = search_terms[0]
@@ -76,8 +89,13 @@ if st.button("Find gifts"):
 
     product_name, price, photos = get_random_product(search_term)
 
-    cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word= product_name, max_distance=10, bucket_array= search_terms, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=5)
+    cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word= product_name, max_distance=10, bucket_array= search_terms, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=10)
+    print(genre)
+    price_binary = get_price_binary(price)
 
+    # input_to_agent = price_binary + genre_binary
+
+    # print(input_to_agent)
 
     st.write(f"Here is a gift idea for you: {product_name}")
     st.write(f"Price: {price}")
