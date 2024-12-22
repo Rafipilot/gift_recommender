@@ -1,4 +1,5 @@
 import streamlit as st
+import numpy as np
 
 # for getting random links
 import random
@@ -89,13 +90,15 @@ if st.button("Find gifts"):
 
     product_name, price, photos = get_random_product(search_term)
 
-    cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word= product_name, max_distance=10, bucket_array= search_terms, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=10)
-    print(genre)
-    price_binary = get_price_binary(price)
+    cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word=product_name, max_distance=10, bucket_array= bucket, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=10)
+ 
+    price_binary = np.array(get_price_binary(price))
 
-    # input_to_agent = price_binary + genre_binary
 
-    # print(input_to_agent)
+    input_to_agent = np.concatenate([price_binary, genre_binary])
+
+    print(input_to_agent)
+    
 
     st.write(f"Here is a gift idea for you: {product_name}")
     st.write(f"Price: {price}")
