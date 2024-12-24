@@ -14,9 +14,21 @@ from config import SER_API_KEY
 import ao_core as ao
 from Arch__giftRecommender import arch
 
+import json
+import re
+with open("google-countries.json") as f:
+    data = json.load(f)
+
+
+country_names = []
+for country in data:
+    country_names.append(country["country_name"])
+
+
+
 client = OpenAI(api_key = openai_key,)
 
-possible_genres = ["Clothes", "Electronics", "Books", "Toys", "Jewelry", "Home", "Beauty", "Sports", "Food", "Music", "Movies", "Games", "Art", "Travel", "Pets", "Health", "Fitness", "Tech", "DIY", "Gardening", "Cooking", "Crafts", "Cars", "Outdoors", "Office", "School", "Baby", "Party", "Wedding", "Holidays", "Other"]
+possible_genres = ["Clothes", "Electronics", "Books", "Toys", "Jewelry", "Home", "Beauty", "Sports", "Food", "Music", "Movies", "Games", "Art", "Travel", "Pets", "Health", "Fitness", "Tech", "DIY", "Gardening", "Cooking", "Crafts", "Cars", "Outdoors", "Office", "School", "Baby", "Party", "Wedding", "Holidays", "Grooming",]
 
 em.config(openai_key)
 
@@ -28,7 +40,8 @@ if "agent" not in st.session_state:
 if "started"    not in st.session_state:
     st.session_state.started = False
 
-
+if "country_code" not in st.session_state:
+    st.session_state.country_code = "us"
 
 def llm_call(input_message): #llm call method 
     response = client.chat.completions.create(
@@ -47,6 +60,7 @@ def get_random_product(search_term):
     params = {
   "engine": "google_shopping",
   "q": f"{search_term}",
+  "gl": f"{st.session_state.country_code}",
   "api_key": f"{SER_API_KEY}",
 }
 
@@ -63,7 +77,12 @@ def get_random_product(search_term):
 
 def get_price_binary(price):
     # Convert price to binary
-    price = float(price.replace("$", ""))
+    match = re.search(r"[-+]?\d*\.\d+|\d+", price)
+
+# Convert the match to a float
+    if match:
+        price = float(match.group())
+    print(price)
     if price <25:
         price_binary = [0,0]
     elif price <50:
@@ -82,8 +101,11 @@ def call_agent(input_to_agent):
 def train_agent(input_to_agent, label):
     if label == "Recommend":
         LABEL = [1,1,1,1,1,1,1,1,1,1]
+        print("positive")
     else:
+        print("negative")
         LABEL = [0,0,0,0,0,0,0,0,0,0]
+    
     st.session_state.agent.next_state(input_to_agent, LABEL)
     
 
@@ -92,9 +114,17 @@ def train_agent(input_to_agent, label):
 st.title("Gift Recommender")
 st.write("Welcome to the gift recommender! We will help you find the perfect gift for your loved ones.")
 
+x = st.selectbox("Country", country_names)
+if x in country_names:
+    for country in data:
+        if country["country_name"] == str(x):
+            st.session_state.country_code = country["country_code"]
+            
+
 age = st.number_input("How old is the person you are buying the gift for?", min_value=0, max_value=100, value=18)
 gender = st.multiselect("What gender is the person you are buying the", ["Male", "Female", "Non-binary", "Prefer not to say"])
 budget = st.number_input("What is your budget?", min_value=0, value=50)
+
 
 request = str(("What are some gift catagories that meet the following: age: ",age, "gender: ", gender, "budget: ", budget))
 
