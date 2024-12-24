@@ -16,6 +16,12 @@ from Arch__giftRecommender import arch
 
 import json
 import re
+
+import httpx
+from parsel import Selector
+from urllib.parse import urlencode
+
+
 with open("google-countries.json") as f:
     data = json.load(f)
 
@@ -56,32 +62,141 @@ def llm_call(input_message): #llm call method
     local_response = response.choices[0].message.content
     return local_response
 
-def get_random_product(search_term):
-    params = {
-  "engine": "google_shopping",
-  "q": f"{search_term}",
-  "gl": f"{st.session_state.country_code}",
-  "api_key": f"{SER_API_KEY}",
+session = httpx.Client(
+    headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.35",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+    },
+    http2=True,
+    follow_redirects=True
+)
+
+def parse_product(response):
+
+    """Parse Ebay's product listing page for core product data"""
+    sel = Selector(response.text)
+    css_join = lambda css: "".join(sel.css(css).getall()).strip()  # join all selected elements
+    css = lambda css: sel.css(css).get("").strip()  # take first selected element and strip of leading/trailing spaces
+
+    item = {}
+    item["url"] = css('link[rel="canonical"]::attr(href)')
+    if item["url"]:
+        item["id"] = item["url"].split("/itm/")[1].split("?")[0]  # extract ID from the URL
+    item["price_original"] = css(".x-price-primary>span::text")
+    item["price_converted"] = css(".x-price-approx__price ::text")  # ebay automatically converts price for some regions
+    item["name"] = css_join("h1 span::text")
+    item["seller_name"] = sel.xpath("//div[contains(@class,'info__about-seller')]/a/span/text()").get()
+    item["seller_url"] = sel.xpath("//div[contains(@class,'info__about-seller')]/a/@href").get()
+    if item["seller_url"]:
+        item["seller_url"] = item["seller_url"].split("?")[0]
+    item["photos"] = sel.css('.ux-image-filmstrip-carousel-item.image img::attr("src")').getall()
+    item["photos"].extend(sel.css('.ux-image-carousel-item.image img::attr("src")').getall())
+    item["description_url"] = css("iframe#desc_ifr::attr(src)")
+
+    features = {}
+    feature_table = sel.css("div.ux-layout-section--features")
+    for feature in feature_table.css("dl.ux-labels-values"):
+        label = "".join(feature.css(".ux-labels-values__labels-content > div > span::text").getall()).strip(":\n ")
+        value = "".join(feature.css(".ux-labels-values__values-content > div > span *::text").getall()).strip(":\n ")
+        features[label] = value
+    item["features"] = features
+
+    return item
+
+def get_random_product(query):
+    limit = 10
+    country_domains = {
+    "us": "ebay.com",
+    "gb": "ebay.co.uk",
+    "de": "ebay.de",
+    "fr": "ebay.fr",
+    "ca": "ebay.ca",
+    "au": "ebay.com.au",
+    "it": "ebay.it",
+    "es": "ebay.es",
+    "nl": "ebay.nl",
+    "at": "ebay.at",
+    "be": "ebay.be",
+    "ch": "ebay.ch",
+    "ie": "ebay.ie",
+    "pl": "ebay.pl",
+    "in": "ebay.in",
+    "sg": "ebay.sg",
+    "my": "ebay.com.my",
+    "ph": "ebay.ph",
+    "hk": "ebay.com.hk",
+    "cn": "ebay.cn",
+    "jp": "ebay.co.jp",
+    "kr": "ebay.co.kr",
+    "tw": "ebay.com.tw",
+    "th": "ebay.co.th",
+    "vn": "ebay.vn",
+    "id": "ebay.co.id",
+    "mx": "mx.ebay.com",
+    "br": "ebay.com.br",
+    "ar": "ebay.com.ar",
+    "cl": "ebay.cl",
+    "co": "ebay.com.co",
+    "pe": "ebay.com.pe",
+    "ve": "ebay.com.ve",
+    "za": "ebay.co.za",
+    "eg": "ebay.com.eg",
+    "sa": "ebay.com.sa",
+    "ae": "ebay.ae",
+    "il": "ebay.co.il",
+    "ru": "ebay.ru",
+    "ua": "ebay.com.ua",
+    "tr": "ebay.com.tr",
+    "cz": "ebay.cz",
+    "sk": "ebay.sk",
+    "hu": "ebay.hu",
+    "ro": "ebay.ro",
+    "gr": "ebay.gr",
+    "se": "ebay.se",
+    "no": "ebay.no",
+
+    # Add more country codes asap
 }
-
-    search = GoogleSearch(params)
-    results = search.get_dict()
-    shopping_results = results["shopping_results"]
-
-    random.shuffle(shopping_results)
     
-    name = shopping_results[0]["title"]
-    price = shopping_results[0]["price"]
-    thumbnail = shopping_results[0]["thumbnail"]
-    return name, price, thumbnail
+    base_url = f"https://{country_domains.get(st.session_state.country_code, 'ebay.com')}/sch/i.html"
+
+    print("using base url: ", base_url)
+    params = {
+        "_nkw": query,  # search keyword
+        "_ipg": limit,  # items per page
+        "_sop": 12,     # best match sort
+    }
+    search_url = f"{base_url}?{urlencode(params)}"
+    response = session.get(search_url)
+
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch search results: {response.status_code}")
+
+    sel = Selector(response.text)
+    product_links = sel.css(".s-item__link::attr(href)").getall()[:limit]
+
+    products = []
+    for link in product_links:
+        product_response = session.get(link)
+        product_data = parse_product(product_response)
+        products.append(product_data)
+
+    random.shuffle(products)
+
+    return products[0]["name"], products[0]["price_original"], products[0]["photos"][0]
 
 def get_price_binary(price):
     # Convert price to binary
     match = re.search(r"[-+]?\d*\.\d+|\d+", price)
+    print("price: ",price)
 
 # Convert the match to a float
     if match:
         price = float(match.group())
+    else:
+        price = float(price)
     print(price)
     if price <25:
         price_binary = [0,0]
