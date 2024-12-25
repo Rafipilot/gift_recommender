@@ -277,11 +277,15 @@ if st.session_state.started:
 
     st.write("Agent Recommendation: ", percentage_response)
 
-    if st.button("Recommend More"):
-        train_agent(input_to_agent, "Recommend")
-    if st.button("Recommend Less"):
-        train_agent(input_to_agent, "Don't Recommend")
-    
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        if st.button("Recommend More"):
+            train_agent(input_to_agent, "Recommend")
+    with col_right:
+        if st.button("Recommend Less"):
+            train_agent(input_to_agent, "Don't Recommend")
+        
 
     
 
