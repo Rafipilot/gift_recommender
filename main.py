@@ -3,13 +3,12 @@ import numpy as np
 
 # for getting random links
 import random
-from serpapi import GoogleSearch
 from openai import OpenAI
 
 import embedding_bucketing.embedding_model_test as em
 
 from config import openai_key
-from config import SER_API_KEY
+
 
 import ao_core as ao
 from Arch__giftRecommender import arch
