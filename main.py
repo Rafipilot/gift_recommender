@@ -183,8 +183,15 @@ def get_random_product(query):
         products.append(product_data)
 
     random.shuffle(products)
+    photo = None
 
-    return products[0]["name"], products[0]["price_original"], products[0]["photos"][0]
+    if products[0].get("photos", [])[0]:
+        photo = products[0]["photos"][0]
+    else:
+        photo = "https://via.placeholder.com/300"
+
+
+    return products[0]["name"], products[0]["price_original"], photo
 
 def get_price_binary(price):
     # Convert price to binary
