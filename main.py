@@ -24,6 +24,21 @@ from urllib.parse import urlencode
 with open("google-countries.json") as f:
     data = json.load(f)
 
+st.set_page_config(
+    page_title="Recommender Demo by AO Labs",
+    page_icon="misc/ao_favicon.png",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        "Get Help": "https://discord.gg/Zg9bHPYss5",
+        "Report a bug": "mailto:eng@aolabs.ai",
+        "About": "AO Labs builds next-gen AI models that learn after training; learn more at docs.aolabs.ai/docs/mnist-benchmark",
+    },
+)
+
+st.title("Gift Recommender")
+st.write("Welcome to the gift recommender! We will help you find the perfect gift for your loved ones.")
+
 
 country_names = []
 for country in data:
@@ -185,9 +200,13 @@ def get_random_product(query):
     random.shuffle(products)
     photo = None
 
-    if products[0].get("photos", [])[0]:
-        photo = products[0]["photos"][0]
-    else:
+    try:
+        if products[0].get("photos", [])[0]:
+            photo = products[0]["photos"][0]
+        else:
+            photo = "https://via.placeholder.com/300"
+    except Exception as e:
+        print(e)
         photo = "https://via.placeholder.com/300"
 
 
@@ -229,75 +248,75 @@ def train_agent(input_to_agent, label):
     
     st.session_state.agent.next_state(input_to_agent, LABEL)
     
+col_left, col_right = st.columns(2)
 
- 
 
-st.title("Gift Recommender")
-st.write("Welcome to the gift recommender! We will help you find the perfect gift for your loved ones.")
 
-x = st.selectbox("Country", country_names)
-if x in country_names:
-    for country in data:
-        if country["country_name"] == str(x):
-            st.session_state.country_code = country["country_code"]
-            
+with col_left:
+    x = st.selectbox("Country", country_names)
+    if x in country_names:
+        for country in data:
+            if country["country_name"] == str(x):
+                st.session_state.country_code = country["country_code"]
+                
 
-age = st.number_input("How old is the person you are buying the gift for?", min_value=0, max_value=100, value=18)
-gender = st.multiselect("What gender is the person you are buying the", ["Male", "Female", "Non-binary", "Prefer not to say"])
-budget = st.number_input("What is your budget?", min_value=0, value=50)
+    age = st.number_input("How old is the person you are buying the gift for?", min_value=0, max_value=100, value=18)
+    gender = st.multiselect("What gender is the person you are buying the", ["Male", "Female", "Non-binary", "Prefer not to say"])
+    budget = st.number_input("What is your budget?", min_value=0, value=50)
 
 
 request = str(("What are some gift catagories that meet the following: age: ",age, "gender: ", gender, "budget: ", budget))
 
-if st.button("Find gifts"):
-    st.session_state.started = True
+with col_right:
+    if st.button("Find gifts"):
+        st.session_state.started = True
 
-if st.session_state.started:
-    search_terms = []
+    if st.session_state.started:
+        search_terms = []
 
-    response = llm_call(request)
+        response = llm_call(request)
 
-    search_terms = [line.split('. ', 1)[1] + ' ' for line in response.splitlines() if '. ' in line]
+        search_terms = [line.split('. ', 1)[1] + ' ' for line in response.splitlines() if '. ' in line]
 
-    random.shuffle(search_terms)    #Shuffle the search terms to get a random one
+        random.shuffle(search_terms)    #Shuffle the search terms to get a random one
 
-    search_term = search_terms[0]
+        search_term = search_terms[0]
 
-    product_name, price, photos = get_random_product(search_term)
+        product_name, price, photos = get_random_product(search_term)
 
-    cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word=product_name, max_distance=10, bucket_array= bucket, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=10)
- 
-    price_binary = np.array(get_price_binary(price))
-
-
-    input_to_agent = np.concatenate([price_binary, genre_binary])
-
-    response = call_agent(input_to_agent)
-
-    counter = 0
-    for element in response:
-        if element == 1:
-            counter += 1
+        cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word=product_name, max_distance=10, bucket_array= bucket, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=10)
     
-    percentage_response = str((counter/len(response))*100) + "%"
+        price_binary = np.array(get_price_binary(price))
 
-    st.write("Agent Recommendation: ", percentage_response)
 
-    col_left, col_right = st.columns(2)
+        input_to_agent = np.concatenate([price_binary, genre_binary])
 
-    with col_left:
-        if st.button("Recommend More"):
-            train_agent(input_to_agent, "Recommend")
-    with col_right:
-        if st.button("Recommend Less"):
-            train_agent(input_to_agent, "Don't Recommend")
+        response = call_agent(input_to_agent)
+
+        counter = 0
+        for element in response:
+            if element == 1:
+                counter += 1
+        
+        percentage_response = str((counter/len(response))*100) + "%"
+
+        st.write("Agent Recommendation: ", percentage_response)
+
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            if st.button("Recommend More"):
+                train_agent(input_to_agent, "Recommend")
+        with col_right:
+            if st.button("Recommend Less"):
+                train_agent(input_to_agent, "Don't Recommend")
+            
+
         
 
-    
-
-    st.write(f"Here is a gift idea for you: {product_name}")
-    st.write(f"Price: {price}")
-    st.write(f"Genre: {genre}")
-    st.image(photos, caption=product_name)
+        st.write(f"Here is a gift idea for you: {product_name}")
+        st.write(f"Price: {price}")
+        st.write(f"Genre: {genre}")
+        st.image(photos, caption=product_name)
 
 
