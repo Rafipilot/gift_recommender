@@ -181,6 +181,8 @@ def get_random_product(query):
         "_nkw": query,  # search keyword
         "_ipg": limit,  # items per page
         "_sop": 12,     # best match sort
+        "_udlo": 0,     # lower price limit
+        "_udhi": budget,  # upper price limit
     }
     search_url = f"{base_url}?{urlencode(params)}"
     response = session.get(search_url)
