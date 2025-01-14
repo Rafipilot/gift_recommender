@@ -1,13 +1,14 @@
 import streamlit as st
 import numpy as np
 
+from urllib.parse import quote
 # for getting random links
 import random
 from openai import OpenAI
 
 import embedding_bucketing.embedding_model_test as em
 
-from config import openai_key
+from config import openai_key, Rapid_key
 
 
 import ao_core as ao
@@ -17,6 +18,7 @@ import json
 import re
 
 import httpx
+import http.client
 from parsel import Selector
 from urllib.parse import urlencode
 
@@ -76,143 +78,36 @@ def llm_call(input_message): #llm call method
     local_response = response.choices[0].message.content
     return local_response
 
-session = httpx.Client(
-    headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.35",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-    },
-    http2=True,
-    follow_redirects=True
-)
 
-def parse_product(response):
-
-    """Parse Ebay's product listing page for core product data"""
-    sel = Selector(response.text)
-    css_join = lambda css: "".join(sel.css(css).getall()).strip()  # join all selected elements
-    css = lambda css: sel.css(css).get("").strip()  # take first selected element and strip of leading/trailing spaces
-
-    item = {}
-    item["url"] = css('link[rel="canonical"]::attr(href)')
-    if item["url"]:
-        item["id"] = item["url"].split("/itm/")[1].split("?")[0]  # extract ID from the URL
-    item["price_original"] = css(".x-price-primary>span::text")
-    item["price_converted"] = css(".x-price-approx__price ::text")  # ebay automatically converts price for some regions
-    item["name"] = css_join("h1 span::text")
-    item["seller_name"] = sel.xpath("//div[contains(@class,'info__about-seller')]/a/span/text()").get()
-    item["seller_url"] = sel.xpath("//div[contains(@class,'info__about-seller')]/a/@href").get()
-    if item["seller_url"]:
-        item["seller_url"] = item["seller_url"].split("?")[0]
-    item["photos"] = sel.css('.ux-image-filmstrip-carousel-item.image img::attr("src")').getall()
-    item["photos"].extend(sel.css('.ux-image-carousel-item.image img::attr("src")').getall())
-    item["description_url"] = css("iframe#desc_ifr::attr(src)")
-
-    features = {}
-    feature_table = sel.css("div.ux-layout-section--features")
-    for feature in feature_table.css("dl.ux-labels-values"):
-        label = "".join(feature.css(".ux-labels-values__labels-content > div > span::text").getall()).strip(":\n ")
-        value = "".join(feature.css(".ux-labels-values__values-content > div > span *::text").getall()).strip(":\n ")
-        features[label] = value
-    item["features"] = features
-
-    return item
-
-def get_random_product(query):
-    limit = 10
-    country_domains = {
-    "us": "ebay.com",
-    "gb": "ebay.co.uk",
-    "de": "ebay.de",
-    "fr": "ebay.fr",
-    "ca": "ebay.ca",
-    "au": "ebay.com.au",
-    "it": "ebay.it",
-    "es": "ebay.es",
-    "nl": "ebay.nl",
-    "at": "ebay.at",
-    "be": "ebay.be",
-    "ch": "ebay.ch",
-    "ie": "ebay.ie",
-    "pl": "ebay.pl",
-    "in": "ebay.in",
-    "sg": "ebay.sg",
-    "my": "ebay.com.my",
-    "ph": "ebay.ph",
-    "hk": "ebay.com.hk",
-    "cn": "ebay.cn",
-    "jp": "ebay.co.jp",
-    "kr": "ebay.co.kr",
-    "tw": "ebay.com.tw",
-    "th": "ebay.co.th",
-    "vn": "ebay.vn",
-    "id": "ebay.co.id",
-    "mx": "mx.ebay.com",
-    "br": "ebay.com.br",
-    "ar": "ebay.com.ar",
-    "cl": "ebay.cl",
-    "co": "ebay.com.co",
-    "pe": "ebay.com.pe",
-    "ve": "ebay.com.ve",
-    "za": "ebay.co.za",
-    "eg": "ebay.com.eg",
-    "sa": "ebay.com.sa",
-    "ae": "ebay.ae",
-    "il": "ebay.co.il",
-    "ru": "ebay.ru",
-    "ua": "ebay.com.ua",
-    "tr": "ebay.com.tr",
-    "cz": "ebay.cz",
-    "sk": "ebay.sk",
-    "hu": "ebay.hu",
-    "ro": "ebay.ro",
-    "gr": "ebay.gr",
-    "se": "ebay.se",
-    "no": "ebay.no",
-
-    # Add more country codes asap
-}
+def get_random_product(query, budget):
+    # Encode the query string to ensure no invalid characters
+    encoded_query = quote(query)
     
-    base_url = f"https://{country_domains.get(st.session_state.country_code, 'ebay.com')}/sch/i.html"
+    conn = http.client.HTTPSConnection("real-time-amazon-data.p.rapidapi.com")
 
-    print("using base url: ", base_url)
-    params = {
-        "_nkw": query,  # search keyword
-        "_ipg": limit,  # items per page
-        "_sop": 12,     # best match sort
-        "_udlo": 0,     # lower price limit
-        "_udhi": budget,  # upper price limit
+    headers = {
+        'x-rapidapi-key': f"{Rapid_key}",
+        'x-rapidapi-host': "real-time-amazon-data.p.rapidapi.com"
     }
-    search_url = f"{base_url}?{urlencode(params)}"
-    response = session.get(search_url)
 
-    if response.status_code != 200:
-        raise Exception(f"Failed to fetch search results: {response.status_code}")
+    # Use the encoded query in the request
+    conn.request("GET", f"/search?query={encoded_query}&page=1&country=US&sort_by=RELEVANCE&product_condition=ALL&is_prime=false&deals_and_discounts=NONE", headers=headers)
 
-    sel = Selector(response.text)
-    product_links = sel.css(".s-item__link::attr(href)").getall()[:limit]
-
-    products = []
-    for link in product_links:
-        product_response = session.get(link)
-        product_data = parse_product(product_response)
-        products.append(product_data)
+    res = conn.getresponse()
+    data = json.loads(res.read().decode("utf-8"))
+    products = data["data"]["products"]
 
     random.shuffle(products)
-    photo = None
+    name = products[0]["product_title"]
+    price = products[0]["product_original_price"]
+    photo = products[0]["product_photo"]
 
-    try:
-        if products[0].get("photos", [])[0]:
-            photo = products[0]["photos"][0]
-        else:
-            photo = "https://via.placeholder.com/300"
-    except Exception as e:
-        print(e)
-        photo = "https://via.placeholder.com/300"
+    if price:
+        pass
+    else:
+        price = 0
 
-
-    return products[0]["name"], products[0]["price_original"], photo
+    return name, price, photo
 
 def get_price_binary(price):
     # Convert price to binary
@@ -284,7 +179,7 @@ with col_right:
 
         search_term = search_terms[0]
 
-        product_name, price, photos = get_random_product(search_term)
+        product_name, price, photos = get_random_product(search_term, budget)
 
         cldis, genre, bucketid, genre_binary = em.auto_sort(cache, word=product_name, max_distance=10, bucket_array= bucket, type_of_distance_calc="COSINE SIMILARITY", amount_of_binary_digits=10)
     
