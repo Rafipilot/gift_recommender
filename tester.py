@@ -10,7 +10,7 @@ def get_random_product(query, budget):
         'x-rapidapi-host': "real-time-amazon-data.p.rapidapi.com"
     }
 
-    conn.request("GET", "/search?query=Drone&page=1&country=US&sort_by=RELEVANCE&product_condition=ALL&is_prime=false&deals_and_discounts=NONE", headers=headers)
+    conn.request("GET", "/search?query=Drone&page=1&country=US&sort_by=RELEVANCE&min_price=20&product_condition=ALL&is_prime=false&deals_and_discounts=NONE", headers=headers)
 
     res = conn.getresponse()
     data = json.loads(res.read().decode("utf-8"))

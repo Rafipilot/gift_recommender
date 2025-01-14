@@ -91,8 +91,9 @@ def get_random_product(query, budget):
     }
 
     # Use the encoded query in the request
-    conn.request("GET", f"/search?query={encoded_query}&page=1&country=US&sort_by=RELEVANCE&product_condition=ALL&is_prime=false&deals_and_discounts=NONE", headers=headers)
+    conn.request("GET", f"/search?query={encoded_query}&page=1&country=US&sort_by=RELEVANCE&min_price=5&max_price={budget}&product_condition=ALL&is_prime=false&deals_and_discounts=NONE", headers=headers)
 
+ 
     res = conn.getresponse()
     data = json.loads(res.read().decode("utf-8"))
     products = data["data"]["products"]
