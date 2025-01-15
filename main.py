@@ -50,7 +50,7 @@ for country in data:
 
 client = OpenAI(api_key = openai_key,)
 
-possible_genres = ["Clothes", "Electronics", "Books", "Toys", "Jewelry", "Home", "Beauty", "Sports", "Food", "Music", "Movies", "Games", "Art", "Travel", "Pets", "Health", "Fitness", "Tech", "DIY", "Gardening", "Cooking", "Crafts", "Cars", "Outdoors", "Office", "School", "Baby", "Party", "Wedding", "Holidays", "Grooming",]
+possible_genres = ["Clothes", "Electronics", "Books For Childnre", "Toys", "Jewelry", "Home", "Beauty", "Sports", "Food", "Music", "Movies", "Games", "Art", "Travel", "Pets", "Health", "Fitness", "Tech", "DIY", "Gardening", "Cooking", "Crafts", "Cars", "Outdoors", "Office", "School", "Baby", "Party", "Wedding", "Holidays", "Grooming", "Books For Teenagers", "Drama Book", "Science Fiction Books", "Romance Books", "Gift Card"]
 
 em.config(openai_key)
 
@@ -96,7 +96,15 @@ def get_random_product(query, budget):
  
     res = conn.getresponse()
     data = json.loads(res.read().decode("utf-8"))
-    products = data["data"]["products"]
+    if data:
+        products = data["data"]["products"]
+    else:
+        data = {
+            "product_title": "Un",
+            "product_original_price": "1",
+            "product_photo": "none"
+
+        }
 
     random.shuffle(products)
     name = products[0]["product_title"]
@@ -112,6 +120,7 @@ def get_random_product(query, budget):
 
 def get_price_binary(price):
     # Convert price to binary
+    price = str(price)
     match = re.search(r"[-+]?\d*\.\d+|\d+", price)
     print("price: ",price)
 
